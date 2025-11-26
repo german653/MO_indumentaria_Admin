@@ -4,34 +4,80 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Faltan las variables de entorno de Supabase');
+  throw new Error('❌ Faltan las variables de entorno de Supabase en el archivo .env');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Helper functions para productos
+// ==========================================
+// PRODUCTS SERVICE
+// ==========================================
 export const productService = {
-  // Obtener todos los productos
-  async getAll() {
-    const { data, error } = await supabase
+  // Obtener todos los productos (admin ve todos, tienda solo activos)
+  async getAll(onlyActive = false) {
+    let query = supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false });
     
+    if (onlyActive) {
+      query = query.eq('active', true);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
-  // Obtener un producto por slug
+  // Obtener producto por slug
   async getBySlug(slug) {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('slug', slug)
+      .eq('active', true)
       .single();
     
     if (error) throw error;
     return data;
+  },
+
+  // Obtener producto por ID
+  async getById(id) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Obtener productos destacados
+  async getFeatured() {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .eq('featured', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Obtener productos por categoría
+  async getByCategory(categoryName) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .eq('category_name', categoryName)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
   },
 
   // Crear producto
@@ -67,16 +113,56 @@ export const productService = {
       .eq('id', id);
     
     if (error) throw error;
+    return true;
+  },
+
+  // Actualizar stock
+  async updateStock(id, quantity) {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ stock: quantity })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Toggle active/inactive
+  async toggleActive(id, active) {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ active })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 };
 
-// Helper functions para categorías
+// ==========================================
+// CATEGORIES SERVICE
+// ==========================================
 export const categoryService = {
   async getAll() {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
       .order('name');
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getBySlug(slug) {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('slug', slug)
+      .single();
     
     if (error) throw error;
     return data;
@@ -112,16 +198,41 @@ export const categoryService = {
       .eq('id', id);
     
     if (error) throw error;
+    return true;
   }
 };
 
-// Helper functions para pedidos
+// ==========================================
+// ORDERS SERVICE
+// ==========================================
 export const orderService = {
   async getAll() {
     const { data, error } = await supabase
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async create(order) {
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([order])
+      .select()
+      .single();
     
     if (error) throw error;
     return data;
@@ -137,19 +248,36 @@ export const orderService = {
     
     if (error) throw error;
     return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
   }
 };
 
-// Helper functions para testimonios
+// ==========================================
+// TESTIMONIALS SERVICE
+// ==========================================
 export const testimonialService = {
-  async getAll() {
-    const { data, error } = await supabase
+  async getAll(onlyActive = false) {
+    let query = supabase
       .from('testimonials')
       .select('*')
       .order('created_at', { ascending: false });
     
+    if (onlyActive) {
+      query = query.eq('active', true);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async create(testimonial) {
@@ -182,10 +310,125 @@ export const testimonialService = {
       .eq('id', id);
     
     if (error) throw error;
+    return true;
+  },
+
+  async toggleActive(id, active) {
+    const { data, error } = await supabase
+      .from('testimonials')
+      .update({ active })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 };
 
-// Helper para estadísticas
+// ==========================================
+// NEWSLETTER SERVICE
+// ==========================================
+export const newsletterService = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('newsletter')
+      .select('*')
+      .order('subscribed_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async subscribe(email) {
+    const { data, error } = await supabase
+      .from('newsletter')
+      .insert([{ email }])
+      .select()
+      .single();
+    
+    if (error) {
+      if (error.code === '23505') { // Duplicate email
+        throw new Error('Este email ya está suscrito');
+      }
+      throw error;
+    }
+    return data;
+  },
+
+  async unsubscribe(email) {
+    const { error } = await supabase
+      .from('newsletter')
+      .delete()
+      .eq('email', email);
+    
+    if (error) throw error;
+    return true;
+  }
+};
+
+// ==========================================
+// SETTINGS SERVICE
+// ==========================================
+export const settingsService = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('*');
+    
+    if (error) throw error;
+    
+    // Convert array to object
+    const settings = {};
+    data?.forEach(item => {
+      settings[item.key] = item.value;
+    });
+    
+    return settings;
+  },
+
+  async get(key) {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', key)
+      .single();
+    
+    if (error) throw error;
+    return data?.value;
+  },
+
+  async set(key, value, type = 'text') {
+    const { data, error } = await supabase
+      .from('settings')
+      .upsert({ key, value, type })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async setMultiple(settings) {
+    const updates = Object.entries(settings).map(([key, value]) => ({
+      key,
+      value: String(value),
+      type: 'text'
+    }));
+
+    const { data, error } = await supabase
+      .from('settings')
+      .upsert(updates)
+      .select();
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
+// ==========================================
+// STATS SERVICE
+// ==========================================
 export const statsService = {
   async getStats() {
     const { data, error } = await supabase
@@ -196,4 +439,32 @@ export const statsService = {
     if (error) throw error;
     return data;
   }
+};
+
+// ==========================================
+// REALTIME SUBSCRIPTIONS
+// ==========================================
+export const subscribeToProducts = (callback) => {
+  return supabase
+    .channel('products-channel')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'products' },
+      callback
+    )
+    .subscribe();
+};
+
+export const subscribeToOrders = (callback) => {
+  return supabase
+    .channel('orders-channel')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'orders' },
+      callback
+    )
+    .subscribe();
+};
+
+// Helper para desuscribirse
+export const unsubscribe = (channel) => {
+  supabase.removeChannel(channel);
 };
