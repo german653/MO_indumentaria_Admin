@@ -468,3 +468,38 @@ export const subscribeToOrders = (callback) => {
 export const unsubscribe = (channel) => {
   supabase.removeChannel(channel);
 };
+
+export const storageService = {
+  async uploadFile(file, folder = 'general') {
+    // 1. Crear un nombre único para el archivo (para no sobrescribir)
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folder}/${Date.now()}_${Math.random()}.${fileExt}`;
+
+    // 2. Subir el archivo al bucket 'images'
+    const { error: uploadError } = await supabase.storage
+      .from('images') // Asegurate que tu bucket se llame 'images'
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error('Error subiendo imagen:', uploadError);
+      throw uploadError;
+    }
+
+    // 3. Obtener la URL pública para guardarla en la base de datos
+    const { data } = supabase.storage
+      .from('images')
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  },
+
+  // (Opcional) Borrar imagen si borras el producto
+  async deleteFile(url) {
+    if (!url) return;
+    // Extraer el path del archivo desde la URL
+    const path = url.split('/storage/v1/object/public/images/')[1];
+    if (path) {
+      await supabase.storage.from('images').remove([path]);
+    }
+  }
+};
